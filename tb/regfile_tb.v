@@ -1,71 +1,58 @@
-module regfile_tb;
-  reg         clk = 0;
-  reg         we;
-  reg  [4:0]  ra1, ra2, wa;
-  reg  [31:0] wd;
-  wire [31:0] rd1, rd2;
-  integer errors = 0;// a counter for failed
+// pc_tb.v - testbench for the program counter
+// a testbench is a virtual lab bench: it makes a clock, pokes the pc, and checks the address
 
-  regfile dut(.clk(clk), .we(we), .ra1(ra1), .ra2(ra2),
-              .wa(wa), .wd(wd), .rd1(rd1), .rd2(rd2));
-   //essentially creates a copy of register file called dut (device under test)
+module program_counter_tb;
+  reg         clk = 0;      // the clock, made by the testbench, starts at 0
+  reg         reset;        // restart switch, the testbench turns it on and off
+  reg         jump;         // 1 = jump to 'target' instead of adding 4 (stands in for the control unit)
+  reg  [31:0] target;       // the address to jump to
+  wire [31:0] pc;           // the pc's output, the testbench only watches this
+  integer errors = 0;       // counts how many checks failed
 
-  always #5 clk = ~clk;//clock flips every 5 units giving full cycle ever 10
+  // this mimics what the full cpu will do: next = jump target, or pc + 4
+  // if jump is 1 use target, otherwise move forward one instruction (4 bytes)
+  wire [31:0] next_pc = jump ? target : pc + 4;
 
-  task write_reg(input [4:0] addr, input [31:0] data);
+  // makes one copy of the program counter called dut (device under test)
+  program_counter dut(.clk(clk), .reset(reset), .next_pc(next_pc), .pc(pc));
+
+  always #5 clk = ~clk;     // clock flips every 5 units, so a full cycle is 10
+
+  // reusable routine: give it the address you expect, it prints FAIL if the pc is different
+  task check(input [31:0] expected);
     begin
-      we = 1; wa = addr; wd = data;
-      @(posedge clk);
-      #1 we = 0;
-      /*register number reusable routine that will write a number into the register*/
-    end
-  endtask
-
-  task read_check(input [4:0] a1, input [31:0] e1,
-                  input [4:0] a2, input [31:0] e2);
-    begin
-      ra1 = a1; ra2 = a2;
-      #1;
-      if (rd1 !== e1) begin
-        $display("FAIL: read x%0d got %0h expected %0h", a1, rd1, e1);
-        errors = errors + 1;
-      end
-      if (rd2 !== e2) begin
-        $display("FAIL: read x%0d got %0h expected %0h", a2, rd2, e2);
-        errors = errors + 1;
+      if (pc !== expected) begin
+        $display("FAIL: pc got %0h expected %0h", pc, expected);
+        errors = errors + 1;     // add one to the failure count
       end
     end
-        /*this helper reads two registors and checks if they hold the number u
-        put in it. if the number is the same it passes others wise it prints fail*/
   endtask
 
   initial begin
-    $dumpfile("regfile.vcd"); $dumpvars(0, regfile_tb);
-    we = 0; ra1 = 0; ra2 = 0; wa = 0; wd = 0;
+    $dumpfile("pc.vcd"); $dumpvars(0, program_counter_tb);   // save every signal for gtkwave
+    reset = 1; jump = 0; target = 0;                         // starting values so nothing is unknown
 
-    write_reg(1, 100);
-    write_reg(2, 200);
-    write_reg(5, 32'hDEADBEEF);
-    read_check(1, 100, 2, 200);
-    read_check(5, 32'hDEADBEEF, 1, 100);
+    // each line below waits for a clock edge, waits 1 more unit, then checks the pc
+    @(posedge clk); #1; check(0);            // reset puts the pc at 0
+    reset = 0;                               // turn reset off, now it can count
 
-    write_reg(0, 999);
-    read_check(0, 0, 0, 0);
+    @(posedge clk); #1; check(4);            // 0 -> 4
+    @(posedge clk); #1; check(8);            // 4 -> 8
+    @(posedge clk); #1; check(12);           // 8 -> 12
 
-    we = 0; wa = 1; wd = 555;
-    @(posedge clk); #1;
-    read_check(1, 100, 2, 200);
+    jump = 1; target = 32'h40;               // now jump to address 0x40
+    @(posedge clk); #1; check(32'h40);       // the pc lands exactly on the target
+    jump = 0;                                // go back to adding 4
+    @(posedge clk); #1; check(32'h44);       // 0x40 -> 0x44, it keeps counting from the new place
 
-    write_reg(1, 7);
-    read_check(1, 7, 2, 200);
+    reset = 1;                               // reset in the middle of a run
+    @(posedge clk); #1; check(0);            // pc snaps back to 0
+    reset = 0;
+    @(posedge clk); #1; check(4);            // and it counts again
 
-    read_check(31, 0, 30, 0);
-
+    // print the final result, then stop the simulation
     if (errors == 0) $display("ALL TESTS PASSED");
     else $display("%0d TESTS FAILED", errors);
     $finish;
-    /*test script made that store a few number in reg files slot, reads them back and
-    checks that each math what is put in. also makes sure register zero is empty
-    it passes silently but prints fail if it fails at the end all tests passed is shown if alls good*/
   end
 endmodule
