@@ -28,7 +28,7 @@ module control_unit(
     jump       = 1'b0;
 
     case (opcode)
-      7'b0110011: begin                  // r-type: add and sub, both numbers come from registers
+      7'b0110011: begin                  // r-type: add, sub, and, or, xor, shifts and slt, both numbers come from registers
         // glue funct7_5 and funct3 together into one 4 bit number so one case can pick between them
         case ({funct7_5, funct3})
           4'b0_000: begin                // add
@@ -47,16 +47,41 @@ module control_unit(
             reg_write = 1'b1;            // save the answer in a register
             alu_op    = 4'b0011;         // alu does or
           end
-          default: begin end             // any other r-type (xor, shifts and so on) isnt supported yet so do nothing
+          4'b0_100: begin                // xor
+            reg_write = 1'b1;            // save the answer in a register
+            alu_op    = 4'b0100;         // alu does xor
+          end
+          4'b0_001: begin                // sll: shift left
+            reg_write = 1'b1;            // save the answer in a register
+            alu_op    = 4'b0101;         // alu shifts left
+          end
+          4'b0_101: begin                // srl: shift right (the 1_101 version is sra, a different shift we havent added)
+            reg_write = 1'b1;            // save the answer in a register
+            alu_op    = 4'b0110;         // alu shifts right
+          end
+          4'b0_010: begin                // slt: set to 1 if a is less than b, otherwise 0
+            reg_write = 1'b1;            // save the answer in a register
+            alu_op    = 4'b0111;         // alu compares
+          end
+          default: begin end             // any other r-type (sra and so on) isnt supported yet so do nothing
         endcase
       end
 
-      7'b0010011: begin                  // addi: a register plus a constant
-        if (funct3 == 3'b000) begin      // only addi for now, the other math with constants (andi, ori) share this opcode
-          reg_write = 1'b1;              // save the answer in a register
-          alu_src   = 1'b1;              // alu b input is the constant, not a register
-          alu_op    = 4'b0000;           // alu adds
-        end
+      7'b0010011: begin                  // math with a constant: addi, andi, ori, xori, slti, slli, srli
+        // all of these share this opcode, funct3 tells them apart, and they all work the same way except for what the alu does
+        // alu_src is 1 so the alu b input is the constant, and the answer gets saved in a register
+        case (funct3)
+          3'b000: begin reg_write = 1'b1; alu_src = 1'b1; alu_op = 4'b0000; end   // addi
+          3'b111: begin reg_write = 1'b1; alu_src = 1'b1; alu_op = 4'b0010; end   // andi
+          3'b110: begin reg_write = 1'b1; alu_src = 1'b1; alu_op = 4'b0011; end   // ori
+          3'b100: begin reg_write = 1'b1; alu_src = 1'b1; alu_op = 4'b0100; end   // xori
+          3'b010: begin reg_write = 1'b1; alu_src = 1'b1; alu_op = 4'b0111; end   // slti
+          3'b001: begin reg_write = 1'b1; alu_src = 1'b1; alu_op = 4'b0101; end   // slli: shift left by the constant
+          3'b101: begin                                                           // srli: shift right by the constant
+            if (!funct7_5) begin reg_write = 1'b1; alu_src = 1'b1; alu_op = 4'b0110; end   // the funct7_5 = 1 version is srai which we havent added
+          end
+          default: begin end
+        endcase
       end
 
       7'b0000011: begin                  // lw: load a number from data memory into a register

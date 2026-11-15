@@ -46,8 +46,23 @@ module control_unit_tb;
     check(32'h00209463, 11'b0_0_0001_0_0_0_1_0);   // bne x1, x2, 8       same as beq but the bne switch is on instead
     check(32'h008000EF, 11'b1_0_0000_0_0_0_0_1);   // jal x1, 8           saves pc + 4 in a register, jump on
 
+    // the new r-type instructions, all use two registers, only the alu operation changes
+    check(32'h0020C1B3, 11'b1_0_0100_0_0_0_0_0);   // xor x3, x1, x2      alu does xor
+    check(32'h002091B3, 11'b1_0_0101_0_0_0_0_0);   // sll x3, x1, x2      alu shifts left
+    check(32'h0020D1B3, 11'b1_0_0110_0_0_0_0_0);   // srl x3, x1, x2      alu shifts right
+    check(32'h0020A1B3, 11'b1_0_0111_0_0_0_0_0);   // slt x3, x1, x2      alu compares
+
+    // the new instructions with a constant, same as addi: the constant goes in, only the alu operation changes
+    check(32'h0050F193, 11'b1_1_0010_0_0_0_0_0);   // andi x3, x1, 5
+    check(32'h0050E193, 11'b1_1_0011_0_0_0_0_0);   // ori x3, x1, 5
+    check(32'h0050C193, 11'b1_1_0100_0_0_0_0_0);   // xori x3, x1, 5
+    check(32'h0050A193, 11'b1_1_0111_0_0_0_0_0);   // slti x3, x1, 5
+    check(32'h00209193, 11'b1_1_0101_0_0_0_0_0);   // slli x3, x1, 2
+    check(32'h0020D193, 11'b1_1_0110_0_0_0_0_0);   // srli x3, x1, 2
+
     // things we dont support yet should do nothing at all
-    check(32'h0020C1B3, 11'b0_0_0000_0_0_0_0_0);   // xor x3, x1, x2      not supported yet so everything stays off
+    check(32'h4020D1B3, 11'b0_0_0000_0_0_0_0_0);   // sra x3, x1, x2      a different shift we havent added, does nothing
+    check(32'h4020D193, 11'b0_0_0000_0_0_0_0_0);   // srai x3, x1, 2      same, does nothing
     check(32'h00008067, 11'b0_0_0000_0_0_0_0_0);   // jalr x0, 0(x1)      a different jump we havent added, does nothing
     check(32'h00000000, 11'b0_0_0000_0_0_0_0_0);   // an empty instruction slot, does nothing
 

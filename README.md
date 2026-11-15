@@ -19,14 +19,17 @@ Every clock tick, the CPU fetches one instruction, decodes it, runs it, and save
 | Instruction | What it does |
 |---|---|
 | `add`, `sub` | register + register, register - register |
-| `and`, `or` | bitwise and, bitwise or of two registers |
-| `addi` | register + constant |
+| `and`, `or`, `xor` | bitwise and, or, xor of two registers |
+| `sll`, `srl` | shift left, shift right (logical) by a register amount |
+| `slt` | set to 1 if the first register is less than the second (signed), else 0 |
+| `addi`, `andi`, `ori`, `xori`, `slti` | the same operations with a constant |
+| `slli`, `srli` | shift left, shift right by a constant |
 | `lw` | load a 32-bit word from memory into a register |
 | `sw` | store a 32-bit word from a register into memory |
 | `beq`, `bne` | jump if two registers are equal, jump if they are not equal |
 | `jal` | always jump, and save `pc + 4` in a register so the program can come back |
 
-This is a subset of RV32I. The remaining RV32I instructions (such as `xor`, shifts, `jalr`, and the byte and half-word loads and stores) are not implemented yet. The control unit does nothing for any instruction it doesn't support.
+This is a subset of RV32I. The remaining RV32I instructions (such as `sra`, `jalr`, `lui`, `auipc`, and the byte and half-word loads and stores) are not implemented yet. The control unit does nothing for any instruction it doesn't support.
 
 ## Block diagram
 
@@ -105,7 +108,7 @@ What the block tests cover:
 - **Instruction memory:** the right instruction comes back for each address, and empty slots read as 0.
 - **Immediate generator:** positive and negative constants for each instruction type, including the largest and smallest values that fit.
 - **Data memory:** write then read back, write enable off blocks writes, and untouched slots read as 0.
-- **Control unit:** every supported instruction sets the right switches, and unsupported ones (`xor`, `jalr`, an empty slot) do nothing.
+- **Control unit:** every supported instruction sets the right switches, and unsupported ones (`sra`, `srai`, `jalr`, an empty slot) do nothing.
 
 The pipelined CPU has its own testbench, `tb/pipe_tb.v`, which runs four programs and checks the final registers and memory:
 
@@ -194,7 +197,8 @@ tb/    a testbench for each block, the whole CPU testbenches, and the program fi
 - [x] Seven blocks designed and tested individually
 - [x] Single-cycle CPU wired together and running a loop in simulation
 - [x] `and`, `or`, `bne`, and `jal` added and tested (`tb/ext_tb.v`)
-- [ ] Remaining RV32I instructions (`xor`, shifts, `jalr`, and the rest)
+- [x] `xor`, shifts, `slt`, and the immediate versions added (control unit tested)
+- [ ] Remaining RV32I instructions (`sra`, `jalr`, `lui`, `auipc`, and the rest)
 - [x] 5-stage pipeline with forwarding, load-use stall, and branch flush (`tb/pipe_tb.v`)
 - [ ] Compare the CPU against the Spike reference simulator and measure performance
 - [ ] Run on an FPGA board with a UART for text output
