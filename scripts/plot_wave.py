@@ -12,7 +12,7 @@ out_path = sys.argv[2] if len(sys.argv) > 2 else "docs/waveform.png"
 
 # the signals to draw, top to bottom (all of them live directly inside the cpu)
 SHOW = ["clk", "pc", "if_id_instr", "stall", "pred_redirect", "mispredict"]
-LABEL = {"clk": "clock", "pc": "pc (address being fetched)", "if_id_instr": "instruction in decode",
+LABEL = {"clk": "clock", "pc": "pc (low 12 bits)", "if_id_instr": "instruction in decode",
          "stall": "stall (load-use)", "pred_redirect": "early redirect (guess: taken)",
          "mispredict": "wrong guess (fixed in EX)"}
 CYCLE = 10          # the testbench clock is 10 time units per tick
@@ -69,7 +69,7 @@ def segments(name):
         segs.append((tt, stop, v))
     return segs
 
-fig, axes = plt.subplots(len(SHOW), 1, figsize=(13, 5.2), sharex=True)
+fig, axes = plt.subplots(len(SHOW), 1, figsize=(16, 5.2), sharex=True)
 for ax, name in zip(axes, SHOW):
     ax.set_yticks([])
     ax.set_ylabel(LABEL[name], rotation=0, ha="right", va="center", fontsize=8)
@@ -90,7 +90,8 @@ for ax, name in zip(axes, SHOW):
         else:
             ax.add_patch(plt.Rectangle((xa, 0.1), xb - xa, 0.8, fill=False, ec="#1f6feb", lw=1.2))
             if xb - xa >= 0.9:
-                ax.text((xa + xb) / 2, 0.5, "x" if v is None else "%08x" % v, ha="center", va="center", fontsize=6)
+                txt = "x" if v is None else ("%03x" % (v & 0xfff) if name == "pc" else "%08x" % v)   # pc shows only its low 3 hex digits so the labels fit
+                ax.text((xa + xb) / 2, 0.5, txt, ha="center", va="center", fontsize=6 if name == "pc" else 5)
             ax.set_ylim(0, 1)
 axes[-1].set_xlabel("clock ticks since reset")
 axes[-1].set_xlim(0, (end - START) / CYCLE)
