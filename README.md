@@ -2,7 +2,7 @@
 
 A single-cycle 32-bit RISC-V CPU designed from scratch in Verilog. It is built from seven blocks. Each block was written and tested on its own with a self-checking testbench, then wired together into one CPU that runs real programs in simulation.
 
-**Status:** single-cycle CPU and a 5-stage pipelined version (with forwarding, a load-use stall, and branch flushing) both working in simulation. A comparison against the Spike reference simulator and an FPGA demo are planned.
+**Status:** single-cycle CPU and a 5-stage pipelined version (with forwarding, a load-use stall, and branch flushing) both working in simulation, and both checked against the Spike RISC-V reference simulator. An FPGA demo is planned.
 
 ## What it does
 
@@ -116,6 +116,20 @@ The pipelined CPU has its own testbench, `tb/pipe_tb.v`, which runs four program
 - the `and`, `or`, `bne`, `jal` program
 - `tb/hazard_prog.hex`, written to trigger forwarding from both pipeline registers, forwarding into a store, a load-use stall, and flushes after a taken `beq` and a `jal`
 
+### Comparison against Spike
+
+Spike is the official RISC-V reference simulator, so it is the standard for what each instruction should do. `scripts/run_compare.sh` runs every program in `sw/` on Spike, the single-cycle CPU, and the pipelined CPU:
+
+- The single-cycle CPU has to match Spike on **every instruction**: same address, same instruction, same register written, same value, and same stores.
+- The pipelined CPU has to finish with the same registers and memory as Spike.
+
+| Program | What it tests | Instructions run | Result |
+|---|---|---|---|
+| `prog1_alu.s` | every ALU instruction with positive, negative, and edge-case values | 24 | matches Spike |
+| `prog2_loop.s` | a `bne` loop, and a multiply done by repeated addition | 74 | matches Spike |
+| `prog3_mem.s` | stores and loads, an array fill, loading a value right after storing or loading it | 83 | matches Spike |
+| `prog4_fib.s` | 15 steps of Fibonacci, then storing results | 103 | matches Spike |
+
 All verification is done in simulation with Icarus Verilog. It has not been run on an FPGA yet.
 
 ## Demo program
@@ -176,6 +190,16 @@ vvp pipe_sim +test=3
 
 Add `+trace` to print what the pipeline is doing every tick.
 
+Compare against Spike (needs the RISC-V compiler and a real Spike, see below):
+
+```
+bash scripts/run_compare.sh
+```
+
+It prints `PASS` for each program and `ALL PROGRAMS MATCH SPIKE` at the end. Programs are plain RISC-V assembly in `sw/`, so adding a test is as simple as adding a `.s` file that uses the supported instructions.
+
+Setting up Spike on Ubuntu: install the compiler with `sudo apt install gcc-riscv64-unknown-elf`, then build Spike from [riscv-software-src/riscv-isa-sim](https://github.com/riscv-software-src/riscv-isa-sim) (`git submodule update --init` first, then `../configure --prefix=$HOME/spike-install && make && make install`). Note that Ubuntu's `spike` apt package is a different program, not the RISC-V simulator.
+
 Test a single block, for example the ALU:
 
 ```
@@ -190,6 +214,8 @@ Run every command from the repository root, because the testbenches load their p
 ```
 rtl/   the CPU design, one file per block plus cpu.v (single cycle) and cpu_pipe.v (pipelined) at the top
 tb/    a testbench for each block, the whole CPU testbenches, and the program files
+sw/    RISC-V assembly test programs that are run on Spike and on both CPUs
+scripts/   the Spike comparison script and the tools it uses
 ```
 
 ## Roadmap
@@ -200,7 +226,8 @@ tb/    a testbench for each block, the whole CPU testbenches, and the program fi
 - [x] `xor`, shifts, `slt`, and the immediate versions added (control unit tested)
 - [ ] Remaining RV32I instructions (`sra`, `jalr`, `lui`, `auipc`, and the rest)
 - [x] 5-stage pipeline with forwarding, load-use stall, and branch flush (`tb/pipe_tb.v`)
-- [ ] Compare the CPU against the Spike reference simulator and measure performance
+- [x] Compared against the Spike reference simulator (4 programs, instruction by instruction)
+- [ ] Measure performance (cycles per instruction, branch penalty)
 - [ ] Run on an FPGA board with a UART for text output
 
 ## Author
