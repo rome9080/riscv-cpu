@@ -1,6 +1,7 @@
 # prog2: two loops
 # loop 1 adds 10 + 9 + ... + 1 using bne to go back to the top (answer 55 in x2)
 # loop 2 multiplies 9 x 13 by adding 13 nine times (answer 117 in x5)
+.globl _start
 _start:
   addi x1, x0, 10         # counter
   addi x2, x0, 0          # sum

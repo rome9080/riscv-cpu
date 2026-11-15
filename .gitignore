@@ -2,3 +2,4 @@ alu_sim
 *.vcd
 *_sim
 build/
+__pycache__/

@@ -1,5 +1,6 @@
 # prog1: tries every alu instruction we have, with positive numbers, negative numbers, and shifts
 # the comments say what each answer should be (as plain numbers)
+.globl _start
 _start:
   addi x1, x0, 100        # x1 = 100
   addi x2, x0, -7         # x2 = -7

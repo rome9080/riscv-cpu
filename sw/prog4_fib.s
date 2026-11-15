@@ -1,4 +1,5 @@
 # prog4: fibonacci, 15 steps, then stores the last two numbers in memory
+.globl _start
 _start:
   addi x1, x0, 0          # fib(n)
   addi x2, x0, 1          # fib(n+1)

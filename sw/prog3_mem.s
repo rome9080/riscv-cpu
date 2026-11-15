@@ -1,6 +1,7 @@
 # prog3: loads and stores
 # the spike side puts memory at 0x80000000, so x10 is set to 0x80000400 and used as the base for all the data
 # (the cpu only looks at the bottom bits of the address so it behaves the same)
+.globl _start
 _start:
   addi x10, x0, 1
   slli x10, x10, 31       # x10 = 0x80000000

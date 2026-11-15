@@ -21,7 +21,7 @@ for src in sw/*.s; do
   python3 scripts/bin2hex.py "build/$name.bin" "build/$name.hex"
 
   # run it on spike with a log of every instruction, the halt loop never ends so we only keep the first 5000 lines
-  timeout 20 spike --isa=rv32i --log-commits "build/$name.elf" 2>&1 | head -n 5000 > "build/$name.spike.log"
+  timeout 20 spike -l --log-commits --isa=rv32i "build/$name.elf" 2>&1 | head -n 5000 > "build/$name.spike.log"
 
   # run it on our two cpus
   vvp build/trace_sim +prog="build/$name.hex" > "build/$name.cpu.log"
