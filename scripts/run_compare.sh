@@ -14,7 +14,7 @@ for src in sw/*.s; do
 
   # assemble and link the program so it starts at 0x80000000, which is where spike starts running
   riscv64-unknown-elf-as -march=rv32i -mabi=ilp32 "$src" -o "build/$name.o" || { echo "FAIL $name: assembler error"; failed=1; continue; }
-  riscv64-unknown-elf-ld -m elf32lriscv -Ttext=0x80000000 -e _start "build/$name.o" -o "build/$name.elf" || { echo "FAIL $name: linker error"; failed=1; continue; }
+  riscv64-unknown-elf-ld -N -m elf32lriscv -Ttext=0x80000000 -e _start "build/$name.o" -o "build/$name.elf" || { echo "FAIL $name: linker error"; failed=1; continue; }
 
   # turn it into the hex file our instruction memory loads
   riscv64-unknown-elf-objcopy -O binary "build/$name.elf" "build/$name.bin"
