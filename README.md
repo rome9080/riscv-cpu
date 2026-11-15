@@ -98,6 +98,12 @@ Cycles to run each test program on the pipelined CPU (`bash scripts/perf.sh`):
 
 All four programs still match Spike after the change, so the predictor only changes speed, never the answers.
 
+## Waveform
+
+![Pipeline waveform running the loop program](docs/waveform.png)
+
+The first 30 ticks of `prog2_loop` on the pipelined CPU. The loop body sits at addresses 008, 00c, 010 and 014, and the pc keeps cycling through them. Each time the branch at 014 reaches the decode stage, the predictor guesses "taken" and sends the pc back to 008 right away, which is the "early redirect" pulse once per trip. The stall row stays flat because this program has no loads, and the wrong-guess row stays flat because the loop does not exit within these 30 ticks. To redraw it: run `wave_tb` in Icarus Verilog, then `python3 scripts/plot_wave.py`.
+
 ## Blocks
 
 | Block | File | What it does |
