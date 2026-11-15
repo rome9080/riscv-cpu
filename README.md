@@ -239,11 +239,11 @@ scripts/   the Spike comparison script and the tools it uses
 - [x] Single-cycle CPU wired together and running a loop in simulation
 - [x] `and`, `or`, `bne`, and `jal` added and tested (`tb/ext_tb.v`)
 - [x] `xor`, shifts, `slt`, and the immediate versions added (control unit tested)
-- [ ] Remaining RV32I instructions (`sra`, `jalr`, `lui`, `auipc`, and the rest)
+- [ ] Remaining RV32I instructions (`sra`, `jalr`, `lui`, `auipc`, byte and half loads/stores) so it can run compiled C
 - [x] 5-stage pipeline with forwarding, load-use stall, and branch flush (`tb/pipe_tb.v`)
 - [x] Compared against the Spike reference simulator (4 programs, instruction by instruction)
 - [x] Measure performance and add a static branch predictor (10 to 14% fewer cycles on programs with branches)
-- [ ] Run on an FPGA board with a UART for text output
+- [ ] Run on an FPGA board with a UART for text output (the simulation is complete, only the board demo is left)
 
 ## Author
 
