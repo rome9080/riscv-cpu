@@ -19,12 +19,14 @@ Every clock tick, the CPU fetches one instruction, decodes it, runs it, and save
 | Instruction | What it does |
 |---|---|
 | `add`, `sub` | register + register, register - register |
+| `and`, `or` | bitwise and, bitwise or of two registers |
 | `addi` | register + constant |
 | `lw` | load a 32-bit word from memory into a register |
 | `sw` | store a 32-bit word from a register into memory |
-| `beq` | jump if two registers are equal |
+| `beq`, `bne` | jump if two registers are equal, jump if they are not equal |
+| `jal` | always jump, and save `pc + 4` in a register so the program can come back |
 
-This is a subset of RV32I. The remaining RV32I instructions (such as `and`, `or`, `bne`, `jal`, and the byte and half-word loads and stores) are not implemented yet. The control unit does nothing for any instruction it doesn't support.
+This is a subset of RV32I. The remaining RV32I instructions (such as `xor`, shifts, `jalr`, and the byte and half-word loads and stores) are not implemented yet. The control unit does nothing for any instruction it doesn't support.
 
 ## Block diagram
 
@@ -65,9 +67,9 @@ This is a subset of RV32I. The remaining RV32I instructions (such as `and`, `or`
 | Register file | `rtl/regfile.v` | 32 registers of 32 bits, two read ports, one write port, register 0 is always 0 |
 | Program counter | `rtl/pc.v` | holds the address of the current instruction, with reset |
 | Instruction memory | `rtl/instr_mem.v` | 64-word program storage, loaded from a hex file |
-| Immediate generator | `rtl/imm_gen.v` | pulls the constant out of I, S, and B type instructions and sign extends it |
+| Immediate generator | `rtl/imm_gen.v` | pulls the constant out of I, S, B, and J type instructions and sign extends it |
 | Data memory | `rtl/data_mem.v` | 64-word memory for `lw` and `sw` |
-| Control unit | `rtl/control_unit.v` | decodes the opcode and sets the six control switches |
+| Control unit | `rtl/control_unit.v` | decodes the opcode and sets the eight control switches |
 | Top level | `rtl/cpu.v` | wires all of the above together, adds two muxes, the `pc + 4` adder, and the branch decision |
 
 ## Verification
@@ -82,7 +84,7 @@ What the block tests cover:
 - **Instruction memory:** the right instruction comes back for each address, and empty slots read as 0.
 - **Immediate generator:** positive and negative constants for each instruction type, including the largest and smallest values that fit.
 - **Data memory:** write then read back, write enable off blocks writes, and untouched slots read as 0.
-- **Control unit:** every supported instruction sets the right switches, and unsupported ones (`and`, `bne`, an empty slot) do nothing.
+- **Control unit:** every supported instruction sets the right switches, and unsupported ones (`xor`, `jalr`, an empty slot) do nothing.
 
 All verification is done in simulation with Icarus Verilog. It has not been run on an FPGA yet.
 
@@ -154,7 +156,8 @@ tb/    a testbench for each block, the whole CPU testbench, and the program file
 
 - [x] Seven blocks designed and tested individually
 - [x] Single-cycle CPU wired together and running a loop in simulation
-- [ ] More RV32I instructions (`and`, `or`, `bne`, `jal`, and the rest)
+- [x] `and`, `or`, `bne`, and `jal` added and tested (`tb/ext_tb.v`)
+- [ ] Remaining RV32I instructions (`xor`, shifts, `jalr`, and the rest)
 - [ ] 5-stage pipeline with forwarding and hazard detection
 - [ ] Compare the CPU against the Spike reference simulator and measure performance
 - [ ] Run on an FPGA board with a UART for text output
