@@ -1,3 +1,4 @@
 alu_sim
 *.vcd
 *_sim
+build/
