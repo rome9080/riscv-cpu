@@ -23,9 +23,13 @@ module imm_gen(
         // the bits are out of order so this puts them back, the last 0 is there because a branch distance is always even
         imm = {{19{instr[31]}}, instr[31], instr[7], instr[30:25], instr[11:8], 1'b0};
 
+      7'b1101111:                // j-type: jal, the constant is scattered even more than a branch
+        // 12 sign bits, then the pieces put back in order, the last 0 is there because a jump distance is always even
+        imm = {{11{instr[31]}}, instr[31], instr[19:12], instr[20], instr[30:21], 1'b0};
+
       default:                   // anything else like add has no constant so just give 0
         imm = 32'd0;
     endcase
   end
 
-endmodule
+endmodule

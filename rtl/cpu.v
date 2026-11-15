@@ -22,7 +22,7 @@ module cpu #(
   wire [31:0] reg_wd;        // the number that gets saved in the register file, either the alu answer or mem_rd
 
   // the switches that come out of the control unit
-  wire        reg_write, alu_src, mem_write, mem_to_reg, branch;
+  wire        reg_write, alu_src, mem_write, mem_to_reg, branch, bne, jump;
   wire [3:0]  alu_op;
 
   // ---------- cutting up the instruction ----------
@@ -36,10 +36,11 @@ module cpu #(
 
   // ---------- deciding where the pc goes next ----------
   // normally it just moves forward one instruction (4 bytes)
-  // but if this is a branch and the alu says the two numbers were equal then it jumps by the constant instead
+  // but if this is a branch and the alu says the two numbers were equal (beq) or not equal (bne) then it jumps by the constant instead
+  // jal always jumps
   wire [31:0] pc_plus4      = pc + 32'd4;                       // the next instruction in order
   wire [31:0] branch_target = pc + imm;                         // where a branch would jump to
-  wire        take_branch   = branch & zero;                    // only jump if its a branch and the numbers were equal
+  wire        take_branch   = (branch & zero) | (bne & ~zero) | jump;   // beq jumps if equal, bne jumps if not equal, jal always jumps
   assign next_pc = take_branch ? branch_target : pc_plus4;      // selector: pick the jump or pick the next one
 
   // ---------- the 7 blocks ----------
@@ -55,7 +56,7 @@ module cpu #(
   control_unit ctrl(
     .opcode(opcode), .funct3(funct3), .funct7_5(funct7_5),
     .reg_write(reg_write), .alu_src(alu_src), .alu_op(alu_op),
-    .mem_write(mem_write), .mem_to_reg(mem_to_reg), .branch(branch)
+    .mem_write(mem_write), .mem_to_reg(mem_to_reg), .branch(branch), .bne(bne), .jump(jump)
   );
 
   // the immediate generator pulls the constant out of the instruction
@@ -77,7 +78,7 @@ module cpu #(
   // the data memory, the alu answer is the address and for sw the number to store is the second register
   data_mem dmem(.clk(clk), .we(mem_write), .addr(alu_result), .wd(rd2), .rd(mem_rd));
 
-  // selector in front of the register file: the alu answer for most instructions, the memory number for lw
-  assign reg_wd = mem_to_reg ? mem_rd : alu_result;
+  // selector in front of the register file: the alu answer for most instructions, the memory number for lw, pc + 4 for jal (the way back)
+  assign reg_wd = jump ? pc_plus4 : (mem_to_reg ? mem_rd : alu_result);
 
-endmodule
+endmodule

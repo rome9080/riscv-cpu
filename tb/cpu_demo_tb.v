@@ -27,10 +27,13 @@ module cpu_demo_tb;
     begin
       case (i[6:0])
         7'b0010011: name = "addi  ";
-        7'b0110011: name = (i[30]) ? "sub   " : "add   ";
+        7'b0110011: name = (i[14:12] == 3'b111) ? "and   " :
+                           (i[14:12] == 3'b110) ? "or    " :
+                           (i[30])               ? "sub   " : "add   ";
         7'b0000011: name = "lw    ";
         7'b0100011: name = "sw    ";
-        7'b1100011: name = "beq   ";
+        7'b1100011: name = (i[14:12] == 3'b001) ? "bne   " : "beq   ";
+        7'b1101111: name = "jal   ";
         default:    name = "???   ";
       endcase
     end

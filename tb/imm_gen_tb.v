@@ -39,6 +39,10 @@ module imm_gen_tb;
     check(32'h00208463, 32'h00000008);   // beq x1, x2, 8       jump forward 8
     check(32'hFE208CE3, 32'hFFFFFFF8);   // beq x1, x2, -8      jump back 8
 
+    // j-type tests, the constant is scattered the most
+    check(32'h008000EF, 32'h00000008);   // jal x1, 8           jump forward 8
+    check(32'hFF9FF06F, 32'hFFFFFFF8);   // jal x0, -8          jump back 8
+
     // no constant
     check(32'h002081B3, 32'h00000000);   // add x3, x1, x2      add has no constant so 0
 
@@ -47,4 +51,4 @@ module imm_gen_tb;
     else $display("%0d TESTS FAILED", errors);
     $finish;
   end
-endmodule
+endmodule

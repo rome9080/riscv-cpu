@@ -9,7 +9,9 @@ module control_unit(
   output reg [3:0] alu_op,     // picks what the alu does, uses the same codes as alu.v (0 = add, 1 = sub)
   output reg       mem_write,  // 1 means store a number in data memory, goes to the we input of the data memory, only sw turns this on
   output reg       mem_to_reg, // picks what gets saved in the register: 0 = the alu answer, 1 = the number read from data memory (lw)
-  output reg       branch      // 1 means this is a branch, if the alu says the two numbers were equal the pc jumps instead of adding 4
+  output reg       branch,     // 1 means this is beq, if the alu says the two numbers were equal the pc jumps instead of adding 4
+  output reg       bne,        // 1 means this is bne, the opposite of beq, the pc jumps if the two numbers were NOT equal
+  output reg       jump        // 1 means this is jal, the pc always jumps and the old pc + 4 gets saved in a register so we can come back
 );
 
   // no clock needed, it works out the answer instantly like the alu
@@ -22,6 +24,8 @@ module control_unit(
     mem_write  = 1'b0;
     mem_to_reg = 1'b0;
     branch     = 1'b0;
+    bne        = 1'b0;
+    jump       = 1'b0;
 
     case (opcode)
       7'b0110011: begin                  // r-type: add and sub, both numbers come from registers
@@ -35,7 +39,15 @@ module control_unit(
             reg_write = 1'b1;            // save the answer in a register
             alu_op    = 4'b0001;         // alu subtracts
           end
-          default: begin end             // any other r-type (and, or and so on) isnt supported yet so do nothing
+          4'b0_111: begin                // and
+            reg_write = 1'b1;            // save the answer in a register
+            alu_op    = 4'b0010;         // alu does and
+          end
+          4'b0_110: begin                // or
+            reg_write = 1'b1;            // save the answer in a register
+            alu_op    = 4'b0011;         // alu does or
+          end
+          default: begin end             // any other r-type (xor, shifts and so on) isnt supported yet so do nothing
         endcase
       end
 
@@ -64,15 +76,24 @@ module control_unit(
         end                              // reg_write stays 0 because sw doesnt save anything in a register
       end
 
-      7'b1100011: begin                  // beq: branch if the two registers are equal
-        if (funct3 == 3'b000) begin      // 000 is beq, bne has a different funct3 so it wont match
+      7'b1100011: begin                  // beq and bne: branch depending on if the two registers are equal
+        if (funct3 == 3'b000) begin      // 000 is beq
           alu_op = 4'b0001;              // alu subtracts, if the answer is 0 the numbers were equal (thats the zero flag)
           branch = 1'b1;                 // tell the pc this might be a jump
         end                              // alu_src stays 0 because both numbers come from registers
+        if (funct3 == 3'b001) begin      // 001 is bne, same as beq but backwards
+          alu_op = 4'b0001;              // alu subtracts again
+          bne    = 1'b1;                 // tell the pc to jump if the answer was NOT 0
+        end
+      end
+
+      7'b1101111: begin                  // jal: jump and link, always jumps and remembers where to come back to
+        reg_write = 1'b1;                // save pc + 4 in the register (the cpu picks that number instead of the alu answer)
+        jump      = 1'b1;                // tell the pc to always jump
       end
 
       default: begin end                 // anything else does nothing
     endcase
   end
 
-endmodule
+endmodule
