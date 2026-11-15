@@ -2,7 +2,7 @@
 
 A single-cycle 32-bit RISC-V CPU designed from scratch in Verilog. It is built from seven blocks. Each block was written and tested on its own with a self-checking testbench, then wired together into one CPU that runs real programs in simulation.
 
-**Status:** single-cycle CPU working in simulation. A 5-stage pipelined version, a comparison against the Spike reference simulator, and an FPGA demo are planned.
+**Status:** single-cycle CPU and a 5-stage pipelined version (with forwarding, a load-use stall, and branch flushing) both working in simulation. A comparison against the Spike reference simulator and an FPGA demo are planned.
 
 ## What it does
 
@@ -59,6 +59,27 @@ This is a subset of RV32I. The remaining RV32I instructions (such as `xor`, shif
                 +--- pc + 4, or pc + immediate for a taken branch
 ```
 
+## Pipelined version
+
+`rtl/cpu_pipe.v` is the same CPU built as a 5-stage assembly line, reusing the same seven blocks. Five instructions are in flight at once, one per stage:
+
+| Stage | What happens |
+|---|---|
+| IF (fetch) | get the instruction |
+| ID (decode) | read registers, build the constant, set the control switches |
+| EX (execute) | the ALU does the math, branches and jumps are decided |
+| MEM | `lw` and `sw` use data memory |
+| WB (write back) | the result is saved in a register |
+
+What it adds on top of the single-cycle design:
+
+- **Pipeline registers** between every stage (IF/ID, ID/EX, EX/MEM, MEM/WB).
+- **Forwarding:** if an instruction needs a result the instruction ahead of it just made, the result is taken straight from the pipeline register instead of waiting for it to be saved. It can come from the EX/MEM or MEM/WB register, and the register file also passes a result through when it is read and written on the same tick.
+- **Load-use stall:** a number loaded by `lw` isn't ready until after the MEM stage, so if the next instruction needs it, the front of the pipeline waits one tick.
+- **Branch flush:** branches and jumps are decided in EX, so the two instructions fetched behind a taken `beq`, `bne`, or `jal` are cancelled.
+
+Pipelining doesn't reduce the number of ticks a program takes (the flush and stall add a few). What it enables is a faster clock, because each stage does a fifth of the work. This has not been timed on real hardware yet.
+
 ## Blocks
 
 | Block | File | What it does |
@@ -85,6 +106,12 @@ What the block tests cover:
 - **Immediate generator:** positive and negative constants for each instruction type, including the largest and smallest values that fit.
 - **Data memory:** write then read back, write enable off blocks writes, and untouched slots read as 0.
 - **Control unit:** every supported instruction sets the right switches, and unsupported ones (`xor`, `jalr`, an empty slot) do nothing.
+
+The pipelined CPU has its own testbench, `tb/pipe_tb.v`, which runs four programs and checks the final registers and memory:
+
+- the 5+4+3+2+1 loop and the 6 x 7 multiply (same answers as the single-cycle CPU)
+- the `and`, `or`, `bne`, `jal` program
+- `tb/hazard_prog.hex`, written to trigger forwarding from both pipeline registers, forwarding into a store, a load-use stall, and flushes after a taken `beq` and a `jal`
 
 All verification is done in simulation with Icarus Verilog. It has not been run on an FPGA yet.
 
@@ -136,6 +163,16 @@ View the waveform:
 gtkwave cpu.vcd
 ```
 
+Run the pipelined CPU on each of the four programs (0 = loop, 1 = multiply, 2 = new instructions, 3 = hazards):
+
+```
+iverilog -s pipe_tb -o pipe_sim rtl/*.v tb/pipe_tb.v
+vvp pipe_sim +test=0
+vvp pipe_sim +test=3
+```
+
+Add `+trace` to print what the pipeline is doing every tick.
+
 Test a single block, for example the ALU:
 
 ```
@@ -148,8 +185,8 @@ Run every command from the repository root, because the testbenches load their p
 ## Repository layout
 
 ```
-rtl/   the CPU design, one file per block plus cpu.v at the top
-tb/    a testbench for each block, the whole CPU testbench, and the program files
+rtl/   the CPU design, one file per block plus cpu.v (single cycle) and cpu_pipe.v (pipelined) at the top
+tb/    a testbench for each block, the whole CPU testbenches, and the program files
 ```
 
 ## Roadmap
@@ -158,7 +195,7 @@ tb/    a testbench for each block, the whole CPU testbench, and the program file
 - [x] Single-cycle CPU wired together and running a loop in simulation
 - [x] `and`, `or`, `bne`, and `jal` added and tested (`tb/ext_tb.v`)
 - [ ] Remaining RV32I instructions (`xor`, shifts, `jalr`, and the rest)
-- [ ] 5-stage pipeline with forwarding and hazard detection
+- [x] 5-stage pipeline with forwarding, load-use stall, and branch flush (`tb/pipe_tb.v`)
 - [ ] Compare the CPU against the Spike reference simulator and measure performance
 - [ ] Run on an FPGA board with a UART for text output
 
