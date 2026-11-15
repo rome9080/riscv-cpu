@@ -9,7 +9,8 @@ module perf_tb;
   reg  [1023:0] prog_file;   // basically holds the name of the program file to load
   integer cycles  = 0;       // total ticks since the reset let go
   integer stalls  = 0;       // ticks lost to load-use stalls
-  integer flushes = 0;       // number of taken branches/jumps (each one throws away instructions)
+  integer flushes = 0;       // ticks where ID redirected early (1 wrong instruction thrown away)
+  integer misses  = 0;       // wrong guesses fixed in EX (2 wrong instructions thrown away)
 
   cpu_pipe #(.PROG_FILE("tb/cpu_prog.hex")) dut(.clk(clk), .reset(reset));
 
@@ -32,10 +33,11 @@ module perf_tb;
     if (!reset) begin
       cycles = cycles + 1;
       if (dut.stall)       stalls  = stalls + 1;
-      if (dut.take_branch) flushes = flushes + 1;
+      if (dut.pred_redirect) flushes = flushes + 1;
+      if (dut.mispredict)    misses  = misses + 1;
       // the halt (beq x0,x0,0) reaching the decode station means the real program is done
       if (dut.if_id_instr == 32'h00000063) begin
-        $display("cycles=%0d stalls=%0d flushes=%0d", cycles, stalls, flushes);
+        $display("cycles=%0d stalls=%0d early_redirects=%0d mispredicts=%0d", cycles, stalls, flushes, misses);
         $finish;
       end
     end

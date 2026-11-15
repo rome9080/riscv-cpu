@@ -88,5 +88,5 @@ module pipe_tb;
 
   // optional: print what the front of the line and the stall and flush are doing every tick
   always @(negedge clk) if ($test$plusargs("trace") && !reset)
-    $display("pc=%08h  in ID=%08h  stall=%b  flush=%b  fwd_a=%b fwd_b=%b", dut.pc, dut.if_id_instr, dut.stall, dut.take_branch, dut.fwd_a, dut.fwd_b);
+    $display("pc=%08h  in ID=%08h  stall=%b  wrong_guess=%b  fwd_a=%b fwd_b=%b", dut.pc, dut.if_id_instr, dut.stall, dut.mispredict, dut.fwd_a, dut.fwd_b);
 endmodule

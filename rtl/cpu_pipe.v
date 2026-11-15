@@ -25,6 +25,7 @@ module cpu_pipe #(
   reg [31:0] id_ex_pc;         // address of the instruction in the EX station
   reg [31:0] id_ex_rd1, id_ex_rd2, id_ex_imm;   // its two register numbers and its constant
   reg [4:0]  id_ex_rs1, id_ex_rs2, id_ex_rd;    // which registers it reads (for forwarding) and which one it will write
+  reg        id_ex_pred;       // 1 if ID guessed this branch/jump would be taken (EX checks the guess)
   reg        id_ex_reg_write, id_ex_alu_src, id_ex_mem_write, id_ex_mem_to_reg, id_ex_branch, id_ex_bne, id_ex_jump;   // its switches
   reg [3:0]  id_ex_alu_op;
 
@@ -82,6 +83,15 @@ module cpu_pipe #(
   wire [31:0] id_rd1 = (mem_wb_reg_write && mem_wb_rd != 5'd0 && mem_wb_rd == id_rs1) ? wb_data : rf_rd1;
   wire [31:0] id_rd2 = (mem_wb_reg_write && mem_wb_rd != 5'd0 && mem_wb_rd == id_rs2) ? wb_data : rf_rd2;
 
+  // ---------- the branch predictor (static, lives in ID) ----------
+  // before: a taken branch was only found out in EX, so 2 wrong instructions were fetched and thrown away (2 wasted ticks)
+  // now: ID makes a guess as soon as it decodes the branch, and redirects the pc right away, so only 1 wrong instruction is thrown away
+  // the guess is "backward branches are taken, forward branches are not" because loops jump backward and are taken most of the time
+  // jal is always taken so it is always guessed taken
+  // a backward branch has a negative constant, so its top bit (imm[31]) is 1
+  wire        id_pred_taken = ((c_branch | c_bne) & id_imm[31]) | c_jump;
+  wire [31:0] id_target     = if_id_pc + id_imm;
+
   // ---------- the stall (hazard detection) ----------
   // problem: lw gets its number from memory, so the number isnt ready until after the MEM station
   // if the very next instruction needs that number, forwarding cant help yet, so we pause the front of the line for one tick
@@ -111,14 +121,18 @@ module cpu_pipe #(
 
   // branches and jumps get decided here in EX
   wire [31:0] branch_target = id_ex_pc + id_ex_imm;
-  wire        take_branch   = (id_ex_branch & zero) | (id_ex_bne & ~zero) | id_ex_jump;
+  wire        actual_taken  = (id_ex_branch & zero) | (id_ex_bne & ~zero) | id_ex_jump;   // what the branch really did
+  wire        mispredict    = (id_ex_pred != actual_taken);                               // the guess from ID was wrong, so fix it here
+  wire [31:0] fix_target    = actual_taken ? branch_target : (id_ex_pc + 32'd4);          // really taken: go to the target, really not taken: carry on after the branch
   wire [31:0] ex_result     = id_ex_jump ? (id_ex_pc + 32'd4) : alu_result;   // jal saves pc + 4, everything else saves the alu answer
 
   // where the pc goes next
-  //   a branch or jump was taken: go to the target (the flush below cancels the wrong instructions behind it)
+  //   EX found the guess was wrong: go to the right place (the flush below cancels the wrong instructions behind it)
   //   a stall: stay put so the instruction doesnt get lost
+  //   ID guessed a branch/jump is taken: go to its target right now
   //   otherwise: next instruction
-  assign next_pc = take_branch ? branch_target : (stall ? pc : pc_plus4);
+  wire pred_redirect = id_pred_taken & ~stall & ~mispredict;   // a wrong guess in EX always wins, and a stalled instruction waits for next tick
+  assign next_pc = mispredict ? fix_target : (stall ? pc : (pred_redirect ? id_target : pc_plus4));
 
   // ---------- station 4: MEM ----------
   wire [31:0] mem_rd;
@@ -132,7 +146,7 @@ module cpu_pipe #(
       id_ex_pc <= 32'd0;  id_ex_rd1 <= 32'd0;  id_ex_rd2 <= 32'd0;  id_ex_imm <= 32'd0;
       id_ex_rs1 <= 5'd0;  id_ex_rs2 <= 5'd0;   id_ex_rd <= 5'd0;
       id_ex_reg_write <= 1'b0;  id_ex_alu_src <= 1'b0;  id_ex_mem_write <= 1'b0;  id_ex_mem_to_reg <= 1'b0;
-      id_ex_branch <= 1'b0;     id_ex_bne <= 1'b0;      id_ex_jump <= 1'b0;       id_ex_alu_op <= 4'd0;
+      id_ex_branch <= 1'b0;     id_ex_bne <= 1'b0;      id_ex_jump <= 1'b0;       id_ex_alu_op <= 4'd0;   id_ex_pred <= 1'b0;
       ex_mem_result <= 32'd0;  ex_mem_store <= 32'd0;  ex_mem_rd <= 5'd0;
       ex_mem_reg_write <= 1'b0;  ex_mem_mem_write <= 1'b0;  ex_mem_mem_to_reg <= 1'b0;
       mem_wb_result <= 32'd0;  mem_wb_mem_rd <= 32'd0;  mem_wb_rd <= 5'd0;
@@ -154,12 +168,14 @@ module cpu_pipe #(
       ex_mem_mem_to_reg <= id_ex_mem_to_reg;
 
       // ID/EX wall: normally take what the ID station produced
-      // but if we are stalling or a branch was taken, put a bubble in instead (every switch off, so it does nothing)
-      if (stall || take_branch) begin
+      // but if we are stalling or the guess was wrong, put a bubble in instead (every switch off, so it does nothing)
+      if (stall || mispredict) begin
+        id_ex_pred <= 1'b0;
         id_ex_reg_write <= 1'b0;  id_ex_alu_src <= 1'b0;  id_ex_mem_write <= 1'b0;  id_ex_mem_to_reg <= 1'b0;
         id_ex_branch <= 1'b0;     id_ex_bne <= 1'b0;      id_ex_jump <= 1'b0;       id_ex_alu_op <= 4'd0;
         id_ex_rs1 <= 5'd0;  id_ex_rs2 <= 5'd0;  id_ex_rd <= 5'd0;
       end else begin
+        id_ex_pred <= id_pred_taken;
         id_ex_reg_write <= c_reg_write;  id_ex_alu_src <= c_alu_src;  id_ex_mem_write <= c_mem_write;
         id_ex_mem_to_reg <= c_mem_to_reg;  id_ex_branch <= c_branch;  id_ex_bne <= c_bne;  id_ex_jump <= c_jump;
         id_ex_alu_op <= c_alu_op;
@@ -171,9 +187,9 @@ module cpu_pipe #(
       id_ex_imm <= id_imm;
 
       // IF/ID wall: normally take the newly fetched instruction
-      //   branch taken: the instruction we just fetched is the wrong one, so throw it away (all 0 = does nothing), this is the flush
+      //   wrong guess or a guessed-taken branch: the instruction we just fetched is the wrong one, so throw it away (all 0 = does nothing), this is the flush
       //   stall: hold the wall as it is so the instruction waits one tick
-      if (take_branch) begin
+      if (mispredict || pred_redirect) begin
         if_id_instr <= 32'd0;
         if_id_pc    <= 32'd0;
       end else if (!stall) begin
