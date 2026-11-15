@@ -83,6 +83,21 @@ What it adds on top of the single-cycle design:
 
 Pipelining doesn't reduce the number of ticks a program takes (the flush and stall add a few). What it enables is a faster clock, because each stage does a fifth of the work. This has not been timed on real hardware yet.
 
+## Branch predictor
+
+A taken branch used to cost 2 wasted ticks, because the CPU only found out in the EX stage and had already fetched 2 wrong instructions. The decode stage now makes a guess as soon as it sees a branch: backward branches (loops) are guessed taken, forward branches are guessed not taken, and `jal` is always taken. A correct guess wastes 1 tick instead of 2. A wrong guess is fixed in EX, the same way as before.
+
+Cycles to run each test program on the pipelined CPU (`bash scripts/perf.sh`):
+
+| Program | Before | After | Faster by |
+|---|---|---|---|
+| prog1_alu | 25 | 25 | 0% (no branches) |
+| prog2_loop | 113 | 97 | 14.2% |
+| prog3_mem | 114 | 104 | 8.8% |
+| prog4_fib | 137 | 122 | 10.9% |
+
+All four programs still match Spike after the change, so the predictor only changes speed, never the answers.
+
 ## Blocks
 
 | Block | File | What it does |
@@ -227,7 +242,7 @@ scripts/   the Spike comparison script and the tools it uses
 - [ ] Remaining RV32I instructions (`sra`, `jalr`, `lui`, `auipc`, and the rest)
 - [x] 5-stage pipeline with forwarding, load-use stall, and branch flush (`tb/pipe_tb.v`)
 - [x] Compared against the Spike reference simulator (4 programs, instruction by instruction)
-- [ ] Measure performance (cycles per instruction, branch penalty)
+- [x] Measure performance and add a static branch predictor (10 to 14% fewer cycles on programs with branches)
 - [ ] Run on an FPGA board with a UART for text output
 
 ## Author
